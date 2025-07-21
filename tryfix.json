@@ -4,7 +4,9 @@
 ────────────────────────────────────────────────────────────────────────────── */
 
 const data = $json;                // full API response
-const city = data.city;            // city block
+const city = data.city ?? {};
+const cityName = city.name ?? 'Unknown';
+const cityCountry = city.country ?? '';
 const blocks = data.list ?? [];    // 3-hour forecasts
 
 /* ── helpers ──────────────────────────────────────────────────────────────── */
@@ -58,7 +60,7 @@ const today = days[dayKeys[0]];
 const ln = '\n';
 const hr = '\n──────────\n';
 
-let md  = `*${esc(city.name)}, ${esc(city.country)} – Weather*${hr}`;
+let md  = `*${esc(cityName)}, ${esc(cityCountry)} – Weather*${hr}`;
 
 md += '*Now*\n';
 md += `🌡️ Temp: \`${fmtT(data.list[0].main.temp)}\`  (feels like \`${fmtT(data.list[0].main.feels_like)}\`)${ln}`;

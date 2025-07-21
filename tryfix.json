@@ -62,12 +62,18 @@ const hr = '\n──────────\n';
 
 let md  = `*${esc(cityName)}, ${esc(cityCountry)} – Weather*${hr}`;
 
+const firstBlock = data.list && data.list[0] ? data.list[0] : null;
+
 md += '*Now*\n';
-md += `🌡️ Temp: \`${fmtT(data.list[0].main.temp)}\`  (feels like \`${fmtT(data.list[0].main.feels_like)}\`)${ln}`;
-md += `📉 Low / High today: \`${fmtT(today.lo)} – ${fmtT(today.hi)}\`${ln}`;
-md += `🛰️ Condition: \`${esc(data.list[0].weather[0].description)}\`${ln}`;
-md += `💧 Humidity: \`${data.list[0].main.humidity}%\`    `;
-md += `💨 Wind: \`${Math.round(data.list[0].wind.speed*3.6)} km/h\`${hr}`;
+if (firstBlock) {
+    md += `🌡️ Temp: \`${fmtT(firstBlock.main.temp)}\`  (feels like \`${fmtT(firstBlock.main.feels_like)}\`)${ln}`;
+    md += `📉 Low / High today: \`${fmtT(today.lo)} – ${fmtT(today.hi)}\`${ln}`;
+    md += `🛰️ Condition: \`${esc(firstBlock.weather[0].description)}\`${ln}`;
+    md += `💧 Humidity: \`${firstBlock.main.humidity}%\`    `;
+    md += `💨 Wind: \`${Math.round(firstBlock.wind.speed*3.6)} km/h\`${hr}`;
+} else {
+    md += '_No current weather data available._' + hr;
+}
 
 md += '*5-Day Forecast*' + ln;
 for (const k of dayKeys) {

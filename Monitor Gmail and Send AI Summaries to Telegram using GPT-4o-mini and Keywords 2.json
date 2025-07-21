@@ -1,0 +1,307 @@
+{
+  "name": "Monitor Gmail and Send AI Summaries to Telegram using GPT-4o-mini and Keywords 2",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 📌 Email Summary to Telegram\n\n## 🔄 What this workflow does\nThis automation checks your Gmail inbox every minute, detects important emails based on keyword filters, and sends a short, Telegram-style summary using GPT-4o-mini.\n\n---\n\n#### 🧩 Node-by-node Breakdown\n\n1. **📥 Email Received**\n   - Gmail Trigger node\n   - Polls inbox every minute for new emails (subject + text)\n\n2. **🧪 Is Important**\n   - Checks if the email is important using keyword filters.\n   - If email subject or body **contains keywords** like `\"Sales\"`, it continues.\n   - Otherwise, it stops.\n\n   **💡 Examples of keywords you can use:**\n   - `\"invoice\"`\n   - `\"payment due\"`\n   - `\"security alert\"`\n   - `\"job offer\"`\n   - `\"delivery\"`  \n   👉 Add anything **important to you** in the condition list.\n\n3. **🧠 AI Agent**\n   - Sends email content to OpenAI with a pre-written system prompt.\n   - Returns a short, human-style summary (max 300 characters) using emojis and plain language.\n\n4. **📤 Send a text message**\n   - Sends the AI-generated summary to your Telegram chat.\n\n---\n\n#### ✅ Sample Telegram Message\n> 📦 Your Flipkart order “Bluetooth Speaker” was delivered today. Enjoy!\n\n---\n\n#### 🛠 Notes\n- You can modify keyword filters in the **Is Important** node.\n- Make sure your **Telegram chat ID and bot** are set correctly.\n- This workflow works well for:\n  - Billing alerts 💰\n  - Delivery updates 📦\n  - Job or HR emails 🧑‍💼\n  - OTP/security messages 🔐\n\n---\n",
+        "height": 80,
+        "width": 548
+      },
+      "id": "5b19646e-e002-4ad0-9422-70d95fa09f79",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2048,
+        -32
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {}
+      },
+      "id": "38ec8af8-000a-4c81-ac84-3f57b13653ff",
+      "name": "Check for New Emails",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "position": [
+        1008,
+        992
+      ],
+      "typeVersion": 1.2,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "qMQuMJKzfddkheFo",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f300ae2b-5de4-4efc-88ae-130a957588cb",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
+              "leftValue": "={{ $json.subject }}",
+              "rightValue": "sales"
+            },
+            {
+              "id": "30e5cc92-886b-4a5b-bc36-6cefc443c66b",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "jobs"
+            },
+            {
+              "id": "14b890ad-0e10-4043-98fa-0ad267534a66",
+              "leftValue": "={{ $json.labelIds[1] }}",
+              "rightValue": "Unread",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "5c3a3de3-8508-40e6-850b-e7d420b58ee5",
+              "leftValue": "={{ $json.labelIds[3] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "e9ca1183-73c2-40ae-8911-dc293c76d3af",
+      "name": "Important Email Filter",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1264,
+        1072
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {},
+      "id": "d646dfa9-28f3-4466-9bbe-154397d1c7af",
+      "name": " Ignore Unimportant Email",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1616,
+        1120
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Email Subject:  {{ $json.subject }}\nEmail Body:  {{ $json.text }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=# 🧠 Multi-Purpose Email Summarizer\n\nYou are an intelligent assistant that reads all kinds of emails — work-related, personal, financial, promotional, alerts, and more.\n\nYour job is to:\n- Understand the core message and intent of the email\n- Write a short, clear **summary (max 1000000 characters)** as if you're notifying the user on Telegram\n- Use **plain English** with light emojis where helpful (📌, ⚠️, ✅, 💰, 🔔, etc.)\n- Highlight any important info: payment due, meeting, offer, delivery, confirmation, alert, etc.\n- Make sure it sounds natural and relevant — like a smart assistant updating someone quickly\n\n## ✍️ Output Format:\nOnly give the **summary text**. No intro, no explanation, no formatting tags.\n\n---\n\n### 📨 Examples:\n\n**Email about invoice:**  \n📌 Invoice from AWS for $23.50 is due by July 20. Check your billing portal to avoid service disruption.\n\n**Email from HR:**  \n✅ HR shared your July payslip. No action needed unless there's an error.\n\n**Amazon delivery email:**  \n📦 Your Amazon order \"AirPods Pro\" has been delivered today. Enjoy!\n\n**Newsletter:**  \n📰 New issue of \"FinTech Weekly\" is out — AI trends, market insights & more.\n\n\n---\n\nOnly return a short, smart Telegram-style summary like above — no headers, no extra context.\n"
+        }
+      },
+      "id": "c5b0111c-f1ee-4d9c-94bc-e64e83c5ba6f",
+      "name": "Summarize Email with GPT-4o",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1216,
+        864
+      ],
+      "typeVersion": 1.8
+    },
+    {
+      "parameters": {
+        "chatId": "860113689",
+        "text": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "id": "7937a159-cb46-445b-87fc-3751297e269c",
+      "name": "Send Summary to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1616,
+        960
+      ],
+      "webhookId": "00abd92f-264e-401b-a032-a8e9e90962c1",
+      "typeVersion": 1.2,
+      "credentials": {
+        "telegramApi": {
+          "id": "wQ7EoWiXbrDhT9eq",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1488,
+        1040
+      ],
+      "id": "ee212c8d-b63b-47e9-9d3c-3368da3be5c4",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "8in3krHNAFtZbw39",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Email Subject:  {{ $json.subject }}\nEmail Body:  {{ $json.text }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=# 🧠 Multi-Purpose Email Summarizer\n\nYou are an intelligent assistant that reads all kinds of emails — work-related, personal, financial, promotional, alerts, and more.\n\nYour job is to:\n- Understand the core message and intent of the email\n- Write a short, clear **summary (max 1000000 characters)** as if you're notifying the user on Telegram\n- Use **plain English** with light emojis where helpful (📌, ⚠️, ✅, 💰, 🔔, etc.)\n- Highlight any important info: payment due, meeting, offer, delivery, confirmation, alert, etc.\n- Make sure it sounds natural and relevant — like a smart assistant updating someone quickly\n\n## ✍️ Output Format:\nOnly give the **summary text**. No intro, no explanation, no formatting tags.\n\n---\n\n### 📨 Examples:\n\n**Email about invoice:**  \n📌 Invoice from AWS for $23.50 is due by July 20. Check your billing portal to avoid service disruption.\n\n**Email from HR:**  \n✅ HR shared your July payslip. No action needed unless there's an error.\n\n**Amazon delivery email:**  \n📦 Your Amazon order \"AirPods Pro\" has been delivered today. Enjoy!\n\n**Newsletter:**  \n📰 New issue of \"FinTech Weekly\" is out — AI trends, market insights & more.\n\n\n---\n\nOnly return a short, smart Telegram-style summary like above — no headers, no extra context.\n"
+        }
+      },
+      "id": "d4f7a64c-ca57-4d9c-8955-afcf2412808f",
+      "name": "Summarize Email with GPT-4o1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        2384,
+        1792
+      ],
+      "typeVersion": 1.8
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        2352,
+        1952
+      ],
+      "id": "80a2e1dc-09a5-45d6-802b-54b5a50ed275",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "8in3krHNAFtZbw39",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Check for New Emails": {
+      "main": [
+        [
+          {
+            "node": "Important Email Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Important Email Filter": {
+      "main": [
+        [
+          {
+            "node": "Summarize Email with GPT-4o",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": " Ignore Unimportant Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Email with GPT-4o": {
+      "main": [
+        [
+          {
+            "node": "Send Summary to Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    " Ignore Unimportant Email": {
+      "main": [
+        []
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Summarize Email with GPT-4o",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Summarize Email with GPT-4o1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Email with GPT-4o1": {
+      "main": [
+        []
+      ]
+    },
+    "Send Summary to Telegram": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "versionId": "ad60cec9-56a9-4d18-a220-4add8f834bc6",
+  "meta": {
+    "templateId": "6025",
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a818269dd9cbbe4fddec0f07362e6c4b44be22ec2bf77800d567aad647f52bfa"
+  },
+  "id": "NBttfY9oFYDpKyWV",
+  "tags": []
+}

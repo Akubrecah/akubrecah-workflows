@@ -1,0 +1,79 @@
+/* ── Weather-to-Telegram Markdown  ────────────────────────────────────────────
+   Input:  $json  ← OpenWeatherMap /forecast (5-day / 3-hour) single object
+   Output: telegram-ready markdown string in  msg.markdown_report
+────────────────────────────────────────────────────────────────────────────── */
+
+const data = $json;                // full API response
+const city = data.city;            // city block
+const blocks = data.list ?? [];    // 3-hour forecasts
+
+/* ── helpers ──────────────────────────────────────────────────────────────── */
+const esc = t => t.toString().replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+const fmtT = t => `${Math.round(t)}°C`;
+const fmtDay = ts => new Date(ts * 1000)
+    .toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+const emoji = id => (
+    id === 800 ? '☀️' :
+    id >= 801 && id <= 804 ? '☁️' :
+    id >= 200 && id <= 232 ? '⛈️' :
+    id >= 300 && id <= 321 ? '🌦️' :
+    id >= 500 && id <= 531 ? '🌧️' :
+    id >= 600 && id <= 622 ? '❄️'  :
+    id >= 700 && id <= 781 ? '🌫️'  : '🌤️'
+);
+
+/* ── aggregate daily lows / highs (and grab a noon sample for the icon) ──── */
+const days = {};   // key = yyyy-mm-dd
+
+for (const b of blocks) {
+    const d = new Date(b.dt * 1000);
+    const key = d.toISOString().slice(0,10);           // YYYY-MM-DD
+    const bucket = days[key] ?? (days[key] = {
+        tsNoon : b.dt,          // will be overwritten until closest to 12:00
+        iconId : b.weather[0].id,
+        desc   : b.weather[0].description, // FIXED: use description
+        lo     : b.main.temp_min,
+        hi     : b.main.temp_max
+    });
+
+    bucket.lo = Math.min(bucket.lo, b.main.temp_min);
+    bucket.hi = Math.max(bucket.hi, b.main.temp_max);
+
+    // keep icon sample closest to noon (12:00 ±1h)
+    const hr = d.getHours();
+    if (Math.abs(hr - 12) < Math.abs(new Date(bucket.tsNoon*1000).getHours() - 12)) {
+        bucket.tsNoon = b.dt;
+        bucket.iconId = b.weather[0].id;
+        bucket.desc   = b.weather[0].description; // FIXED: use description
+    }
+}
+
+/* sort days & take first 5 */
+const dayKeys = Object.keys(days).sort().slice(0,5);
+
+/* today’s range (index 0) */
+const today = days[dayKeys[0]];
+
+/* ── build markdown ───────────────────────────────────────────────────────── */
+const ln = '\n';
+const hr = '\n──────────\n';
+
+let md  = `*${esc(city.name)}, ${esc(city.country)} – Weather*${hr}`;
+
+md += '*Now*\n';
+md += `🌡️ Temp: \`${fmtT(data.list[0].main.temp)}\`  (feels like \`${fmtT(data.list[0].main.feels_like)}\`)${ln}`;
+md += `📉 Low / High today: \`${fmtT(today.lo)} – ${fmtT(today.hi)}\`${ln}`;
+md += `🛰️ Condition: \`${esc(data.list[0].weather[0].description)}\`${ln}`;
+md += `💧 Humidity: \`${data.list[0].main.humidity}%\`    `;
+md += `💨 Wind: \`${Math.round(data.list[0].wind.speed*3.6)} km/h\`${hr}`;
+
+md += '*5-Day Forecast*' + ln;
+for (const k of dayKeys) {
+    const d = days[k];
+    md += `➡️ *${esc(fmtDay(d.tsNoon))}* `;
+    md += `\`${fmtT(d.lo)} – ${fmtT(d.hi)}\` `;
+    md += `${emoji(d.iconId)} _${esc(d.desc)}_\n`;
+}
+
+/* ── return for Telegram node ─────────────────────────────────────────────── */
+return { json: { markdown_report: md }};

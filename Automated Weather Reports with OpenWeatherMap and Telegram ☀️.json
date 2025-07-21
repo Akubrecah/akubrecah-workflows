@@ -106,14 +106,14 @@
       "name": "Merge",
       "type": "n8n-nodes-base.merge",
       "position": [
-        1392,
-        240
+        1360,
+        288
       ],
       "typeVersion": 3.2
     },
     {
       "parameters": {
-        "jsCode": "/* ── Weather-to-Telegram Markdown  ────────────────────────────────────────────\n   Input:  $json  ← OpenWeatherMap /forecast (5-day / 3-hour) single object\n   Output: telegram-ready markdown string in  msg.markdown_report\n────────────────────────────────────────────────────────────────────────────── */\n\nconst data = $json;                // full API response\nconst city = data.city;            // city block\nconst blocks = data.list ?? [];    // 3-hour forecasts\n\n/* ── helpers ──────────────────────────────────────────────────────────────── */\nconst esc = t => t.toString().replace(/[_*[\\]()~`>#+\\-=|{}.!]/g, '\\\\$&');\nconst fmtT = t => `${Math.round(t)}°C`;\nconst fmtDay = ts => new Date(ts * 1000)\n\t.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });\nconst emoji = id => (\n\tid === 800 ? '☀️' :\n\tid >= 801 && id <= 804 ? '☁️' :\n\tid >= 200 && id <= 232 ? '⛈️' :\n\tid >= 300 && id <= 321 ? '🌦️' :\n\tid >= 500 && id <= 531 ? '🌧️' :\n\tid >= 600 && id <= 622 ? '❄️'  :\n\tid >= 700 && id <= 781 ? '🌫️'  : '🌤️'\n);\n\n/* ── aggregate daily lows / highs (and grab a noon sample for the icon) ──── */\nconst days = {};   // key = yyyy-mm-dd\n\nfor (const b of blocks) {\n\tconst d = new Date(b.dt * 1000);\n\tconst key = d.toISOString().slice(0,10);           // YYYY-MM-DD\n\tconst bucket = days[key] ?? (days[key] = {\n\t\ttsNoon : b.dt,          // will be overwritten until closest to 12:00\n\t\ticonId : b.weather[0].id,\n\t\tdesc   : b.weather[0].main,\n\t\tlo     : b.main.temp_min,\n\t\thi     : b.main.temp_max\n\t});\n\n\tbucket.lo = Math.min(bucket.lo, b.main.temp_min);\n\tbucket.hi = Math.max(bucket.hi, b.main.temp_max);\n\n\t// keep icon sample closest to noon (12:00 ±1h)\n\tconst hr = d.getHours();\n\tif (Math.abs(hr - 12) < Math.abs(new Date(bucket.tsNoon*1000).getHours() - 12)) {\n\t\tbucket.tsNoon = b.dt;\n\t\tbucket.iconId = b.weather[0].id;\n\t\tbucket.desc   = b.weather[0].main;\n\t}\n}\n\n/* sort days & take first 5 */\nconst dayKeys = Object.keys(days).sort().slice(0,5);\n\n/* today’s range (index 0) */\nconst today = days[dayKeys[0]];\n\n/* ── build markdown ───────────────────────────────────────────────────────── */\nconst ln = '\\n';\nconst hr = '\\n──────────\\n';\n\nlet md  = `*${esc(city.name)}, ${esc(city.country)} – Weather*${hr}`;\n\nmd += '*Now*\\n';\nmd += `🌡️ Temp: \\`${fmtT(data.list[0].main.temp)}\\`  (feels like \\`${fmtT(data.list[0].main.feels_like)}\\`)${ln}`;\nmd += `📉 Low / High today: \\`${fmtT(today.lo)} – ${fmtT(today.hi)}\\`${ln}`;\nmd += `🛰️ Condition: \\`${esc(data.list[0].weather[0].description)}\\`${ln}`;\nmd += `💧 Humidity: \\`${data.list[0].main.humidity}%\\`    `;\nmd += `💨 Wind: \\`${Math.round(data.list[0].wind.speed*3.6)} km/h\\`${hr}`;\n\nmd += '*5-Day Forecast*' + ln;\nfor (const k of dayKeys) {\n\tconst d = days[k];\n\tmd += `➡️ *${esc(fmtDay(d.tsNoon))}* `;\n\tmd += `\\`${fmtT(d.lo)} – ${fmtT(d.hi)}\\` `;\n\tmd += `${emoji(d.iconId)} _${esc(d.desc)}_\\n`;\n}\n\n/* ── return for Telegram node ─────────────────────────────────────────────── */\nreturn { json: { markdown_report: md }};"
+        "jsCode": "/* ── Weather-to-Telegram Markdown  ────────────────────────────────────────────\n   Input:  $json  ← OpenWeatherMap /forecast (5-day / 3-hour) single object\n   Output: telegram-ready markdown string in  msg.markdown_report\n────────────────────────────────────────────────────────────────────────────── */\n\nconst data = $json;                // full API response\nconst city = data.city ?? {};\nconst cityName = city.name ?? 'Unknown';\nconst cityCountry = city.country ?? '';\nconst blocks = data.list ?? [];    // 3-hour forecasts\n\n/* ── helpers ──────────────────────────────────────────────────────────────── */\nconst esc = t => t.toString().replace(/[_*[\\]()~`>#+\\-=|{}.!]/g, '\\\\$&');\nconst fmtT = t => `${Math.round(t)}°C`;\nconst fmtDay = ts => new Date(ts * 1000)\n    .toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });\nconst emoji = id => (\n    id === 800 ? '☀️' :\n    id >= 801 && id <= 804 ? '☁️' :\n    id >= 200 && id <= 232 ? '⛈️' :\n    id >= 300 && id <= 321 ? '🌦️' :\n    id >= 500 && id <= 531 ? '🌧️' :\n    id >= 600 && id <= 622 ? '❄️'  :\n    id >= 700 && id <= 781 ? '🌫️'  : '🌤️'\n);\n\n/* ── aggregate daily lows / highs (and grab a noon sample for the icon) ──── */\nconst days = {};   // key = yyyy-mm-dd\n\nfor (const b of blocks) {\n    const d = new Date(b.dt * 1000);\n    const key = d.toISOString().slice(0,10);           // YYYY-MM-DD\n    const bucket = days[key] ?? (days[key] = {\n        tsNoon : b.dt,          // will be overwritten until closest to 12:00\n        iconId : b.weather[0].id,\n        desc   : b.weather[0].description, // FIXED: use description\n        lo     : b.main.temp_min,\n        hi     : b.main.temp_max\n    });\n\n    bucket.lo = Math.min(bucket.lo, b.main.temp_min);\n    bucket.hi = Math.max(bucket.hi, b.main.temp_max);\n\n    // keep icon sample closest to noon (12:00 ±1h)\n    const hr = d.getHours();\n    if (Math.abs(hr - 12) < Math.abs(new Date(bucket.tsNoon*1000).getHours() - 12)) {\n        bucket.tsNoon = b.dt;\n        bucket.iconId = b.weather[0].id;\n        bucket.desc   = b.weather[0].description; // FIXED: use description\n    }\n}\n\n/* sort days & take first 5 */\nconst dayKeys = Object.keys(days).sort().slice(0,5);\n\n/* today’s range (index 0) */\nconst today = days[dayKeys[0]];\n\n/* ── build markdown ───────────────────────────────────────────────────────── */\nconst ln = '\\n';\nconst hr = '\\n──────────\\n';\n\nlet md  = `*${esc(cityName)}, ${esc(cityCountry)} – Weather*${hr}`;\n\nconst firstBlock = data.list && data.list[0] ? data.list[0] : null;\n\nmd += '*Now*\\n';\nif (firstBlock) {\n    md += `🌡️ Temp: \\`${fmtT(firstBlock.main.temp)}\\`  (feels like \\`${fmtT(firstBlock.main.feels_like)}\\`)${ln}`;\n    md += `📉 Low / High today: \\`${fmtT(today.lo)} – ${fmtT(today.hi)}\\`${ln}`;\n    md += `🛰️ Condition: \\`${esc(firstBlock.weather[0].description)}\\`${ln}`;\n    md += `💧 Humidity: \\`${firstBlock.main.humidity}%\\`    `;\n    md += `💨 Wind: \\`${Math.round(firstBlock.wind.speed*3.6)} km/h\\`${hr}`;\n} else {\n    md += '_No current weather data available._' + hr;\n}\n\nmd += '*5-Day Forecast*' + ln;\nfor (const k of dayKeys) {\n    const d = days[k];\n    md += `➡️ *${esc(fmtDay(d.tsNoon))}* `;\n    md += `\\`${fmtT(d.lo)} – ${fmtT(d.hi)}\\` `;\n    md += `${emoji(d.iconId)} _${esc(d.desc)}_\\n`;\n}\n\n/* ── return for Telegram node ─────────────────────────────────────────────── */\nreturn { json: { markdown_report: md }};"
       },
       "id": "43d58689-f6fa-4a88-8a3c-04cfc212b498",
       "name": "Report: Prepare",
@@ -123,31 +123,6 @@
         240
       ],
       "typeVersion": 2
-    },
-    {
-      "parameters": {
-        "chatId": "={{ $('Set Location').item.json.telegram_chat_id }}",
-        "text": "={{ $json.markdown_report }}",
-        "additionalFields": {
-          "appendAttribution": false,
-          "parse_mode": "Markdown"
-        }
-      },
-      "id": "7cab6251-db7f-4fb0-ad08-bf0e060cfc64",
-      "name": "Send a text message",
-      "type": "n8n-nodes-base.telegram",
-      "position": [
-        1968,
-        240
-      ],
-      "webhookId": "5738ca6e-ad42-4f46-8938-bf37c033ec3e",
-      "typeVersion": 1.2,
-      "credentials": {
-        "telegramApi": {
-          "id": "wQ7EoWiXbrDhT9eq",
-          "name": "Telegram account 3"
-        }
-      }
     },
     {
       "parameters": {
@@ -228,19 +203,57 @@
         192
       ],
       "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Set Location').item.json.Timezone }}",
+        "text": "weather update",
+        "additionalFields": {}
+      },
+      "id": "7cab6251-db7f-4fb0-ad08-bf0e060cfc64",
+      "name": "Send a text message",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1968,
+        240
+      ],
+      "webhookId": "5738ca6e-ad42-4f46-8938-bf37c033ec3e",
+      "typeVersion": 1.2,
+      "credentials": {
+        "telegramApi": {
+          "id": "wQ7EoWiXbrDhT9eq",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "860113689",
+        "text": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "id": "ca91e56d-8abf-432f-b9f6-af1f4ae4b031",
+      "name": "Send Summary to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1504,
+        48
+      ],
+      "webhookId": "00abd92f-264e-401b-a032-a8e9e90962c1",
+      "typeVersion": 1.2,
+      "credentials": {
+        "telegramApi": {
+          "id": "wQ7EoWiXbrDhT9eq",
+          "name": "Telegram account 3"
+        }
+      }
     }
   ],
   "pinData": {},
   "connections": {
     "Merge": {
       "main": [
-        [
-          {
-            "node": "Report: Prepare",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Set Location": {
@@ -256,20 +269,14 @@
     },
     "Weather: 5Days": {
       "main": [
-        [
-          {
-            "node": "Merge",
-            "type": "main",
-            "index": 1
-          }
-        ]
+        []
       ]
     },
     "Report: Prepare": {
       "main": [
         [
           {
-            "node": "Send a text message",
+            "node": "Send Summary to Telegram",
             "type": "main",
             "index": 0
           }
@@ -291,7 +298,7 @@
       "main": [
         [
           {
-            "node": "Merge",
+            "node": "Report: Prepare",
             "type": "main",
             "index": 0
           }
@@ -301,7 +308,7 @@
   },
   "active": false,
   "settings": {},
-  "versionId": "bb8a0b14-a359-40f7-8b4a-e8df91fa4420",
+  "versionId": "8d0a6bf7-9a53-4e4c-9aab-224f5e65b39f",
   "meta": {
     "templateId": "6176",
     "instanceId": "a818269dd9cbbe4fddec0f07362e6c4b44be22ec2bf77800d567aad647f52bfa"
